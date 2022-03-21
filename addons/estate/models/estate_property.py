@@ -1,4 +1,5 @@
 from odoo import fields, models, api
+from odoo.exceptions import UserError
 from dateutil.relativedelta import relativedelta
 
 class EstateProperty(models.Model):
@@ -42,6 +43,11 @@ class EstateProperty(models.Model):
     total_area = fields.Float(compute="_compute_total")
     best_price = fields.Float(compute="_compute_best")
 
+    # _sql_constraints = [
+    #     ('check_expected_price', 'CHECK(expected_price > 0)',
+    #      'The expected price may must be positive')
+    # ]
+
     @api.depends("living_area", "garden_area")
     def _compute_total(self):
         for record in self:
@@ -50,7 +56,10 @@ class EstateProperty(models.Model):
     @api.depends("offer_ids.price")
     def _compute_best(self):
         for record in self:
-            record.best_price = max(record.offer_ids.mapped('price'))
+            all_offers = record.offer_ids.mapped('price')
+            record.best_price = 0
+            if all_offers:
+                record.best_price = max(all_offers)
     
     @api.onchange('garden')
     def _onchange_garden(self):
@@ -60,5 +69,25 @@ class EstateProperty(models.Model):
         else:
             self.garden_area = 0
             self.garden_orientation = None
-
     
+    def set_state_sold(self):
+        for record in self:
+            if record.state == 'canceled':
+                raise UserError("can't sell a canceled property")
+                return False
+
+            best_offer = record.offer_ids.sorted('price')[-1]
+            best_offer.status = 'accepted'
+            record.selling_price = best_offer.price
+            record.buyer_id = best_offer.partner_id
+            record.state = "sold"
+        return True
+
+    def set_state_canceled(self):
+        for record in self:
+            if record.state == 'sold':
+                raise UserError("can't cancel a sold property")
+                return False
+            
+            record.state = "canceled"
+        return True

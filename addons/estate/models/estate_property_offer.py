@@ -1,4 +1,5 @@
 from odoo import fields, models, api
+from odoo.exceptions import UserError
 from dateutil.relativedelta import relativedelta
 
 class EstatePropertyOffer(models.Model):
@@ -11,7 +12,7 @@ class EstatePropertyOffer(models.Model):
         selection=[('accepted', 'Accepted'), ('refused', 'Refused')]
     )
     validity = fields.Integer(default=7)
-    date_deadline = fields.Date(compute="_compute_deadline", inverse="_compute_validity")
+    date_deadline = fields.Date(string="Deadline", compute="_compute_deadline", inverse="_compute_validity")
 
     partner_id = fields.Many2one('res.partner', string='Partner', required=True)
     property_id = fields.Many2one('estate.property', string='Property', required=True)
@@ -28,3 +29,24 @@ class EstatePropertyOffer(models.Model):
         for record in self:
             delta = record.date_deadline - record.create_date.date()
             record.validity = delta.days
+
+    def accept(self):
+        for record in self:
+            if record.property_id.state in ['offer_accepted', 'sold', 'canceled']:
+                return False
+            
+            record.status = 'accepted'
+            record.property_id.selling_price = record.price
+            record.property_id.buyer_id = record.partner_id
+            record.property_id.state = "offer_accepted"
+        return True
+    
+    def reject(self):
+        for record in self:
+            if record.status == 'accepted':
+                raise UserError("can't reject an accepted property")
+                return False
+            
+            record.status = 'refused'
+        return True
+    

@@ -29,6 +29,10 @@
         <field name="model">estate.property</field>
         <field name="arch" type="xml">
             <form string="Lost Reason">
+                <header>
+                    <button name="set_state_sold" type="object" string="Sold"/>
+                    <button name="set_state_canceled" type="object" string="canceled"/>
+                </header>
                 <sheet>
                     <group>
                         <h1>
@@ -39,6 +43,7 @@
                         <newline/>
                         <group>
                             <group>
+                                <field name="state"/>
                                 <field name="property_type_id"/>
                                 <field name="postcode"/>
                                 <field name="date_availability"/>
@@ -69,9 +74,11 @@
                                     <tree>
                                         <field name="price"/>
                                         <field name="partner_id"/>
-                                        <field name="status"/>
                                         <field name="validity"/>
                                         <field name="date_deadline"/>
+                                        <button name="accept" type="object" icon="fa-check"/>
+                                        <button name="reject" string="X" type="object" icon="fa-xmark"/>
+                                        <field name="status"/>
                                     </tree>
                                 </field>
                             </page>
