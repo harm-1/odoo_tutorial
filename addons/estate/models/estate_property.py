@@ -1,5 +1,5 @@
 from odoo import fields, models, api
-from odoo.exceptions import UserError
+from odoo.exceptions import UserError, ValidationError
 from dateutil.relativedelta import relativedelta
 
 class EstateProperty(models.Model):
@@ -43,10 +43,17 @@ class EstateProperty(models.Model):
     total_area = fields.Float(compute="_compute_total")
     best_price = fields.Float(compute="_compute_best")
 
-    # _sql_constraints = [
-    #     ('check_expected_price', 'CHECK(expected_price > 0)',
-    #      'The expected price may must be positive')
-    # ]
+    _sql_constraints = [
+        ('check_expected_price', 'CHECK(expected_price > 0)', 'The expected price may must be positive'),
+        ('check_selling_price', 'CHECK(selling_price > 0)', 'The selling price may must be positive'),
+    ]
+
+    def unlink(self):
+        if self.state not in ['new', 'canceled']:
+            raise UserError('cant delete a record that is sold or canceled')
+        for offer in self.offer_ids:
+            offer.unlink()
+        return super().unlink()
 
     @api.depends("living_area", "garden_area")
     def _compute_total(self):
@@ -69,6 +76,13 @@ class EstateProperty(models.Model):
         else:
             self.garden_area = 0
             self.garden_orientation = None
+    
+    @api.constrains('selling_price')
+    def set_lower_limit(self):
+        for record in self:
+            if record.state in ['offer_received', 'offer_accepted', 'sold'] and \
+                record.selling_price < 0.9 * record.expected_price:
+                raise ValidationError("Toooo low")
     
     def set_state_sold(self):
         for record in self:
